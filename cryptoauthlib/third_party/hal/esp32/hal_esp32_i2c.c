@@ -19,6 +19,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "cryptoauthlib.h"
+#include "esp_idf_version.h"
 
 #define I2C0_SDA_PIN                       CONFIG_ATCA_I2C_SDA_PIN
 #define I2C0_SCL_PIN                       CONFIG_ATCA_I2C_SCL_PIN
@@ -175,6 +176,10 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t address, uint8_t *txdata, int 
     //ESP_LOGD(TAG, "txdata: %p , txlength: %d", txdata, txlength);
     //ESP_LOG_BUFFER_HEXDUMP(TAG, txdata, txlength, 3);
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+    rc = i2c_master_write_to_device(cfg->atcai2c.bus, address >> 1, txdata,
+                                               txlength, 100 / portTICK_PERIOD_MS);
+#else
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     (void)i2c_master_start(cmd);
     (void)i2c_master_write_byte(cmd, address | I2C_MASTER_WRITE, ACK_CHECK_EN);
@@ -182,6 +187,7 @@ ATCA_STATUS hal_i2c_send(ATCAIface iface, uint8_t address, uint8_t *txdata, int 
     (void)i2c_master_stop(cmd);
     rc = i2c_master_cmd_begin(cfg->atcai2c.bus, cmd, 10);
     (void)i2c_cmd_link_delete(cmd);
+#endif
 
     if (ESP_OK != rc)
     {
@@ -213,6 +219,10 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t address, uint8_t *rxdata, u
         return ATCA_TRACE(ATCA_INVALID_POINTER, "NULL pointer encountered");
     }
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+    rc = i2c_master_read_from_device(cfg->atcai2c.bus, address >> 1, rxdata,
+                                     *rxlength, 100 / portTICK_PERIOD_MS);
+#else
     cmd = i2c_cmd_link_create();
     (void)i2c_master_start(cmd);
     (void)i2c_master_write_byte(cmd, address | I2C_MASTER_READ, ACK_CHECK_EN);
@@ -224,7 +234,7 @@ ATCA_STATUS hal_i2c_receive(ATCAIface iface, uint8_t address, uint8_t *rxdata, u
     (void)i2c_master_stop(cmd);
     rc = i2c_master_cmd_begin(cfg->atcai2c.bus, cmd, 10);
     (void)i2c_cmd_link_delete(cmd);
-
+#endif
     //ESP_LOG_BUFFER_HEXDUMP(TAG, rxdata, *rxlength, 3);
 
     if (ESP_OK == rc)
